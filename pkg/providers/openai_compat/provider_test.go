@@ -376,6 +376,92 @@ func TestProviderChat_AcceptsNumericOptionTypes(t *testing.T) {
 	}
 }
 
+func TestProviderChat_SkipsPromptCacheKeyForNonOpenAIEndpoint(t *testing.T) {
+	var requestBody map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		resp := map[string]any{
+			"choices": []map[string]any{
+				{
+					"message":       map[string]any{"content": "ok"},
+					"finish_reason": "stop",
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	p := NewProvider("key", server.URL, "")
+	_, err := p.Chat(
+		t.Context(),
+		[]Message{{Role: "user", Content: "hi"}},
+		nil,
+		"gpt-4o",
+		map[string]any{"prompt_cache_key": "agent-123"},
+	)
+	if err != nil {
+		t.Fatalf("Chat() error = %v", err)
+	}
+
+	if _, ok := requestBody["prompt_cache_key"]; ok {
+		t.Fatalf("did not expect prompt_cache_key for non-OpenAI endpoint")
+	}
+}
+
+func TestSupportsPromptCacheKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		apiBase string
+		want    bool
+	}{
+		{
+			name:    "openai endpoint",
+			apiBase: "https://api.openai.com/v1",
+			want:    true,
+		},
+		{
+			name:    "openai apex endpoint",
+			apiBase: "https://openai.com/v1",
+			want:    true,
+		},
+		{
+			name:    "nvidia endpoint",
+			apiBase: "https://integrate.api.nvidia.com/v1",
+			want:    false,
+		},
+		{
+			name:    "gemini endpoint",
+			apiBase: "https://generativelanguage.googleapis.com/v1beta",
+			want:    false,
+		},
+		{
+			name:    "openrouter endpoint",
+			apiBase: "https://openrouter.ai/api/v1",
+			want:    false,
+		},
+		{
+			name:    "local endpoint",
+			apiBase: "http://localhost:11434/v1",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := supportsPromptCacheKey(tt.apiBase)
+			if got != tt.want {
+				t.Fatalf("supportsPromptCacheKey(%q) = %v, want %v", tt.apiBase, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNormalizeModel_UsesAPIBase(t *testing.T) {
 	if got := normalizeModel("deepseek/deepseek-chat", "https://api.deepseek.com/v1"); got != "deepseek-chat" {
 		t.Fatalf("normalizeModel(deepseek) = %q, want %q", got, "deepseek-chat")
