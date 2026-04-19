@@ -52,7 +52,7 @@ func NewProvider(apiKey, apiBase, userAgent string) *Provider {
 
 // NewProviderWithTimeout creates a provider with custom request timeout.
 func NewProviderWithTimeout(apiKey, apiBase, userAgent string, timeoutSeconds int) *Provider {
-	baseURL := common.NormalizeAnthropicBaseURL(apiBase, defaultBaseURL, true)
+	baseURL := common.NormalizeBaseURL(apiBase, defaultBaseURL, true)
 	timeout := defaultRequestTimeout
 	if timeoutSeconds > 0 {
 		timeout = time.Duration(timeoutSeconds) * time.Second

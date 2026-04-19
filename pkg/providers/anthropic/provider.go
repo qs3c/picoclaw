@@ -43,7 +43,7 @@ func NewProvider(token string) *Provider {
 }
 
 func NewProviderWithBaseURL(token, apiBase string) *Provider {
-	baseURL := common.NormalizeAnthropicBaseURL(apiBase, defaultBaseURL, false)
+	baseURL := common.NormalizeBaseURL(apiBase, defaultBaseURL, false)
 	client := anthropic.NewClient(
 		option.WithAuthToken(token),
 		option.WithBaseURL(baseURL),
